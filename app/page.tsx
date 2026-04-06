@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import ControlPanel from '@/components/ControlPanel';
 import DataDashboard from '@/components/DataDashboard';
-import SimulationCanvas from '@/components/SimulationCanvas';
+import dynamic from 'next/dynamic';
+const SimulationCanvas = dynamic(() => import('@/components/SimulationCanvas'), { ssr: false });
 import { calculateFresnelBalance, SystemInputs, SystemOutputs } from '@/utils/thermodynamics/balances';
 
 export default function Home() {
@@ -77,29 +78,60 @@ export default function Home() {
   }, [transientTarget]);
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800 p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <main className="min-h-screen text-slate-800 p-4 md:p-8 font-sans selection:bg-blue-200">
+      <div className="max-w-[1400px] mx-auto space-y-8">
         
-        <header className="flex flex-col gap-2">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Simulador de Generación de Vapor (Fresnel)</h1>
-          <p className="text-slate-600 font-medium">Motor de Balances Termodinámicos (Basado en Felder & Rousseau)</p>
+        {/* Header Ultra Premium */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-200">
+          <div className="flex flex-col gap-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold uppercase tracking-widest w-fit mb-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              </span>
+              Engine Live
+            </div>
+            <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
+              Generador de Vapor <span className="text-blue-600">Fresnel</span>
+            </h1>
+            <p className="text-slate-500 font-medium text-lg flex items-center gap-2">
+              Motor Termodinámico Estricto <span className="hidden md:inline text-slate-300">•</span> Basado en Felder & Rousseau
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-4 text-sm font-mono text-slate-400 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase.tracking-wider">Resolution Time</span>
+              <span className="text-slate-700 font-bold">16ms</span>
+            </div>
+            <div className="w-px h-8 bg-slate-200"></div>
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase.tracking-wider">Model</span>
+              <span className="text-slate-700 font-bold">Transient</span>
+            </div>
+          </div>
         </header>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          <aside className="w-full lg:w-1/3">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+          {/* Panel Izquierdo */}
+          <aside className="w-full xl:col-span-3">
             <ControlPanel inputs={inputs} setInputs={setInputs} />
           </aside>
           
-          <section className="w-full lg:w-2/3 flex flex-col gap-6 ">
-            {/* Visualización en tiempo Real del Lienzo */}
-            {outputs && (
-              <SimulationCanvas 
-                outletState={outputs.outletState} 
-                inletTemp={inputs.inletTemp} 
-              />
-            )}
+          {/* Contenido Principal (Canvas + Data) */}
+          <section className="w-full xl:col-span-9 flex flex-col gap-6">
+            <div className="grid grid-cols-1 gap-6">
+              {outputs && (
+                <div className="w-full rounded-3xl overflow-hidden glass-panel p-2">
+                  <SimulationCanvas 
+                    outletState={outputs.outletState} 
+                    inletTemp={inputs.inletTemp}
+                    inputs={inputs}
+                  />
+                </div>
+              )}
+            </div>
             
-            {/* Analíticas Numéricas */}
             <DataDashboard outputs={outputs} />
           </section>
         </div>
