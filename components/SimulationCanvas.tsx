@@ -1,18 +1,20 @@
 'use client';
 
-import React, { useRef, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, MeshTransmissionMaterial, Grid, Sparkles } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { ThermoState } from '@/utils/thermodynamics/properties';
 import { SystemInputs } from '@/utils/thermodynamics/balances';
+import type { RankineOutputs } from '@/utils/thermodynamics/rankine';
 import { Eye, RotateCcw } from 'lucide-react';
 
 interface CanvasProps {
   outletState: ThermoState;
   inletTemp: number;
   inputs: SystemInputs;
+  rankineOutputs?: RankineOutputs;
 }
 
 const TUBE_LENGTH = 12;
@@ -594,9 +596,226 @@ function PhaseBadge({ phase, quality }: { phase: string; quality?: number }) {
   );
 }
 
-export default function SimulationCanvas({ outletState, inputs }: CanvasProps) {
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  fill: string | CanvasGradient,
+  stroke?: string
+) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.stroke();
+  }
+}
+
+function drawRankineDiagram(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  outputs: RankineOutputs,
+  inputs: SystemInputs,
+  t: number
+) {
+  ctx.clearRect(0, 0, w, h);
+
+  const leftW = w * 0.45;
+  const rightX = leftW + 20;
+
+  const dniFactor = Math.max(0, Math.min(1, inputs.dni / 1000));
+  const mirrorRows = Math.max(6, Math.min(18, Math.round(outputs.area_campo_m2 / 1000)));
+
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, 'rgba(240,165,0,0.10)');
+  sky.addColorStop(1, 'rgba(13,17,23,0.0)');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, leftW, h);
+
+  const receptorY = h * 0.23;
+  const receptorGlow = 0.5 + 0.5 * Math.sin(t * 2.3);
+  ctx.strokeStyle = `rgba(217,79,61,${0.65 + receptorGlow * 0.25 * dniFactor})`;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(36, receptorY);
+  ctx.lineTo(leftW - 28, receptorY);
+  ctx.stroke();
+
+  for (let i = 0; i < mirrorRows; i += 1) {
+    const y = h * 0.38 + (i % 9) * 22;
+    const x = 28 + Math.floor(i / 9) * 95;
+    const mirrorW = 78;
+    const mirrorH = 8;
+
+    const angle = Math.sin(t * 1.2 + i * 0.45) * 0.3;
+    const grad = ctx.createLinearGradient(x, y, x + mirrorW, y + mirrorH);
+    grad.addColorStop(0, `rgba(88,166,255,${0.35 + 0.18 * Math.cos(angle)})`);
+    grad.addColorStop(1, `rgba(230,237,243,${0.38 + 0.22 * Math.sin(angle)})`);
+
+    ctx.fillStyle = grad;
+    drawRoundedRect(ctx, x, y, mirrorW, mirrorH, 3, grad);
+
+    const centerX = x + mirrorW / 2;
+    const centerY = y + mirrorH / 2;
+    ctx.strokeStyle = `rgba(240,165,0,${0.15 + 0.45 * dniFactor})`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(leftW * 0.52, receptorY);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255,226,122,${0.10 + 0.40 * dniFactor})`;
+    ctx.beginPath();
+    ctx.moveTo(centerX, 20);
+    ctx.lineTo(centerX, y - 2);
+    ctx.stroke();
+  }
+
+  const equipos = [
+    { key: 'caldera', label: 'Caldera', x: rightX + 16, y: h * 0.14, color: '#e07b39' },
+    { key: 'turbina', label: 'Turbina', x: rightX + 220, y: h * 0.14, color: '#d94f3d' },
+    { key: 'condensador', label: 'Condensador', x: rightX + 220, y: h * 0.55, color: '#1a6b9a' },
+    { key: 'bomba', label: 'Bomba', x: rightX + 16, y: h * 0.55, color: '#58a6ff' },
+  ];
+
+  const boxW = 140;
+  const boxH = 62;
+
+  equipos.forEach((eq) => {
+    drawRoundedRect(ctx, eq.x, eq.y, boxW, boxH, 10, 'rgba(22,27,34,0.78)', `rgba(48,54,61,0.9)`);
+    ctx.fillStyle = eq.color;
+    ctx.font = 'bold 14px Space Grotesk';
+    ctx.fillText(eq.label, eq.x + 12, eq.y + 23);
+  });
+
+  const p1 = { x: equipos[3].x + boxW, y: equipos[3].y + boxH / 2 };
+  const p2 = { x: equipos[0].x, y: equipos[0].y + boxH / 2 };
+  const p3 = { x: equipos[0].x + boxW, y: equipos[0].y + boxH / 2 };
+  const p4 = { x: equipos[1].x, y: equipos[1].y + boxH / 2 };
+  const p5 = { x: equipos[1].x + boxW / 2, y: equipos[1].y + boxH };
+  const p6 = { x: equipos[2].x + boxW / 2, y: equipos[2].y };
+  const p7 = { x: equipos[2].x, y: equipos[2].y + boxH / 2 };
+  const p8 = { x: equipos[3].x + boxW, y: equipos[3].y + boxH / 2 };
+
+  ctx.strokeStyle = 'rgba(240,165,0,0.65)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.lineTo(p3.x, p3.y);
+  ctx.lineTo(p4.x, p4.y);
+  ctx.lineTo(p5.x, p5.y);
+  ctx.lineTo(p6.x, p6.y);
+  ctx.lineTo(p7.x, p7.y);
+  ctx.lineTo(p8.x, p8.y);
+  ctx.stroke();
+
+  const particleCount = 22;
+  for (let i = 0; i < particleCount; i += 1) {
+    const phase = (t * (0.2 + inputs.massFlowRate * 0.02) + i / particleCount) % 1;
+    const seg = Math.floor(phase * 4);
+    let x = 0;
+    let y = 0;
+    let color = '#58a6ff';
+
+    if (seg === 0) {
+      const f = (phase * 4) % 1;
+      x = p1.x + (p4.x - p1.x) * f;
+      y = p1.y;
+      color = '#d94f3d';
+    } else if (seg === 1) {
+      const f = (phase * 4) % 1;
+      x = p5.x;
+      y = p5.y + (p6.y - p5.y) * f;
+      color = '#f5a623';
+    } else if (seg === 2) {
+      const f = (phase * 4) % 1;
+      x = p7.x + (p8.x - p7.x) * f;
+      y = p7.y;
+      color = '#1a6b9a';
+    } else {
+      const f = (phase * 4) % 1;
+      x = p2.x;
+      y = p2.y + (p1.y - p2.y) * f;
+      color = '#58a6ff';
+    }
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const stateBubbles = [
+    { n: 1, x: p1.x - 70, y: p1.y + 15, st: outputs.estado_1, c: '#58a6ff' },
+    { n: 2, x: p4.x - 30, y: p4.y - 70, st: outputs.estado_2, c: '#d94f3d' },
+    { n: 3, x: p6.x + 10, y: p6.y - 8, st: outputs.estado_3, c: '#f5a623' },
+    { n: 4, x: p7.x - 80, y: p7.y - 70, st: outputs.estado_4, c: '#1a6b9a' },
+  ];
+
+  stateBubbles.forEach((b) => {
+    drawRoundedRect(ctx, b.x, b.y, 150, 54, 8, 'rgba(13,17,23,0.72)', `${b.c}`);
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = '600 11px JetBrains Mono';
+    ctx.fillText(`E${b.n}  T=${b.st.T.toFixed(1)}°C`, b.x + 8, b.y + 18);
+    ctx.fillText(`P=${b.st.P_bar.toFixed(2)} bar`, b.x + 8, b.y + 32);
+    ctx.fillText(`Ĥ=${b.st.H.toFixed(1)} kJ/kg`, b.x + 8, b.y + 46);
+  });
+}
+
+export default function SimulationCanvas({ outletState, inputs, rankineOutputs }: CanvasProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!rankineOutputs) return;
+
+    const canvas = overlayRef.current;
+    const host = hostRef.current;
+    if (!canvas || !host) return;
+
+    let raf = 0;
+    const resize = () => {
+      const rect = host.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width);
+      canvas.height = Math.floor(rect.height);
+    };
+    resize();
+
+    const ro = new ResizeObserver(resize);
+    ro.observe(host);
+
+    const tick = (time: number) => {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        drawRankineDiagram(ctx, canvas.width, canvas.height, rankineOutputs, inputs, time * 0.001);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [inputs, rankineOutputs]);
+
   return (
     <div
+      ref={hostRef}
       className="w-full h-full min-h-[600px] relative rounded-2xl overflow-hidden border border-white/10"
       style={{ background: 'linear-gradient(135deg, #0c0c14 0%, #0a0f1a 50%, #0d0d16 100%)' }}
     >
@@ -773,6 +992,14 @@ export default function SimulationCanvas({ outletState, inputs }: CanvasProps) {
       >
         <Scene outletState={outletState} inputs={inputs} />
       </Canvas>
+
+      {rankineOutputs && (
+        <canvas
+          ref={overlayRef}
+          className="pointer-events-none absolute inset-0"
+          style={{ mixBlendMode: 'screen', opacity: 0.85 }}
+        />
+      )}
     </div>
   );
 }

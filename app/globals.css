@@ -1,59 +1,109 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=JetBrains+Mono:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222.2 84% 4.9%;
+    --color-bg: #0d1117;
+    --color-surface: #161b22;
+    --color-surface-2: #1c2128;
+    --color-border: #30363d;
+    --color-solar: #f0a500;
+    --color-solar-dark: #e06c00;
+    --color-success: #3fb950;
+    --color-blue: #58a6ff;
+    --color-text: #e6edf3;
+    --color-muted: #8b949e;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-
-    --radius: 1rem;
+    --color-agua-fria: #1a6b9a;
+    --color-agua-caliente: #e07b39;
+    --color-vapor-sat: #f5a623;
+    --color-vapor-sobrec: #d94f3d;
   }
 
   body {
-    /* Custom subtle hex pattern or dot pattern for engineering vibe */
-    background-color: #f8fafc;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: 'Space Grotesk', sans-serif;
     background-image: 
-      radial-gradient(#e2e8f0 1px, transparent 0),
-      radial-gradient(#e2e8f0 1px, transparent 0);
-    background-position: 0 0, 20px 20px;
-    background-size: 40px 40px;
+      radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 0),
+      radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 0);
+    background-position: 0 0, 22px 22px;
+    background-size: 44px 44px;
   }
 }
 
 @layer utilities {
+  .font-mono-data {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
   .text-balance {
     text-wrap: balance;
   }
+
   .glass-panel {
-    @apply bg-white/70 backdrop-blur-xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+    @apply bg-[#161b22]/70 backdrop-blur-xl border border-[#30363d] shadow-[0_8px_30px_rgba(0,0,0,0.25)];
   }
+
   .dark-glass-panel {
-    @apply bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 shadow-[0_8px_30px_rgb(0,0,0,0.12)];
+    @apply bg-[#0d1117]/80 backdrop-blur-xl border border-[#30363d] shadow-[0_8px_30px_rgba(0,0,0,0.32)];
+  }
+
+  .particle {
+    animation: flowRight 2s linear infinite;
+  }
+
+  .particle-up {
+    animation: flowUp 2s linear infinite;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .print-card {
+    border: 1px solid #ccc;
+    margin-bottom: 1rem;
+  }
+}
+
+@keyframes flowRight {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+@keyframes flowUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(-400%);
+  }
+}
+
+@keyframes fillGauge {
+  from {
+    stroke-dashoffset: 283;
+  }
+  to {
+    stroke-dashoffset: var(--gauge-offset);
   }
 }
